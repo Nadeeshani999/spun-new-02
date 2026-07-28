@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spun Pole Production — Wastage Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg-deep:#10131A; --bg-panel:#1A1F28; --bg-panel-alt:#1F2530; --bg-raised:#232A36;
+  --line:rgba(255,255,255,0.07); --line-strong:rgba(255,255,255,0.14);
+  --steel:#4E86C8; --steel-dim:#2E4A6B;
+  --amber:#E8B23C; --amber-dim:#5C4A22;
+  --orange:#F2703C; --green:#57C695;
+  --text:#EEF1F5; --text-mute:#8B93A3; --text-faint:#5B6272;
+  --mono:'IBM Plex Mono',monospace; --disp:'Oswald',sans-serif; --body:'Inter',sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:linear-gradient(var(--line) 1px, transparent 1px) 0 0/100% 42px, var(--bg-deep);
+  color:var(--text); font-family:var(--body); min-height:100vh; padding-bottom:80px;
+}
+::selection{background:var(--steel);color:#fff;}
+
+header.rail{
+  border-bottom:1px solid var(--line-strong);
+  background:linear-gradient(180deg,#151A22,#10131A 90%);
+  padding:22px 32px 18px; position:sticky; top:0; z-index:50; backdrop-filter:blur(6px);
+}
+.rail-inner{max-width:1440px;margin:0 auto;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand-mark{width:40px;height:40px;border:2px solid var(--steel);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:11px;color:var(--steel);background:repeating-linear-gradient(135deg, var(--steel-dim) 0 3px, transparent 3px 8px);}
+.brand h1{font-family:var(--disp);font-weight:600;font-size:22px;letter-spacing:0.04em;text-transform:uppercase;margin:0;}
+.brand p{margin:2px 0 0;color:var(--text-mute);font-size:12px;font-family:var(--mono);letter-spacing:0.03em;}
+.rail-stats{display:flex;gap:28px;flex-wrap:wrap;}
+.rail-stat{text-align:right;}
+.rail-stat .k{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--steel);line-height:1;}
+.rail-stat .l{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-mute);margin-top:4px;}
+.rail-stat.warn .k{color:var(--orange);}
+
+main{max-width:1440px;margin:0 auto;padding:28px 32px;}
+
+.sec-head{display:flex;align-items:baseline;gap:12px;margin:38px 0 16px;}
+.sec-head .tag{font-family:var(--mono);font-size:11px;color:var(--steel);border:1px solid var(--steel-dim);padding:2px 8px;border-radius:2px;letter-spacing:0.05em;}
+.sec-head h2{font-family:var(--disp);font-size:19px;text-transform:uppercase;letter-spacing:0.04em;font-weight:500;margin:0;color:var(--text);}
+.sec-head .rule{flex:1;height:1px;background:var(--line-strong);}
+.sec-head .hint{font-size:12px;color:var(--text-faint);}
+
+/* type banner divider for 6m vs 8.3m */
+.type-banner{
+  display:flex;align-items:center;gap:14px;margin:44px 0 18px;padding:12px 18px;border-radius:6px;
+  border:1px solid var(--line-strong);
+}
+.type-banner.t6{background:linear-gradient(90deg, rgba(78,134,200,0.14), transparent);border-left:4px solid var(--steel);}
+.type-banner.t83{background:linear-gradient(90deg, rgba(232,178,60,0.14), transparent);border-left:4px solid var(--amber);}
+.type-banner .swatch{width:14px;height:14px;border-radius:3px;}
+.type-banner.t6 .swatch{background:var(--steel);}
+.type-banner.t83 .swatch{background:var(--amber);}
+.type-banner h2{font-family:var(--disp);font-size:22px;text-transform:uppercase;letter-spacing:.04em;margin:0;font-weight:600;}
+.type-banner .std-tag{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--text-mute);}
+
+.panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:6px;padding:20px 22px;}
+.grid2{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+label.field-label{display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-mute);margin-bottom:6px;font-family:var(--mono);}
+input[type=text], input[type=number], select{width:100%;background:var(--bg-raised);border:1px solid var(--line-strong);color:var(--text);padding:10px 11px;border-radius:4px;font-family:var(--mono);font-size:13px;}
+input:focus, select:focus{outline:none;border-color:var(--steel);box-shadow:0 0 0 3px rgba(78,134,200,0.15);}
+.std-row{display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;}
+.std-row .fld{flex:1;min-width:130px;}
+.btn{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:0.06em;background:var(--steel);color:#0d1117;border:none;padding:10px 18px;border-radius:4px;cursor:pointer;font-weight:600;}
+.btn:hover{filter:brightness(1.12);}
+.btn.secondary{background:transparent;border:1px solid var(--line-strong);color:var(--text-mute);}
+.btn.secondary:hover{border-color:var(--steel);color:var(--steel);}
+.btn.small{padding:6px 12px;font-size:11px;}
+.actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;align-items:center;}
+.panel-note{font-size:11.5px;color:var(--text-faint);margin-top:10px;line-height:1.5;}
+.status-msg{font-family:var(--mono);font-size:11.5px;color:var(--green);}
+.status-msg.err{color:var(--orange);}
+
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;}
+.kpi{background:var(--bg-panel);border:1px solid var(--line);border-radius:6px;padding:16px 18px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--steel-dim);}
+.kpi.t6::before{background:var(--steel);}
+.kpi.t83::before{background:var(--amber);}
+.kpi.alert::before{background:var(--orange);}
+.kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-mute);font-family:var(--mono);margin-bottom:8px;}
+.kpi .v{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--text);line-height:1;}
+.kpi .sub{font-size:11px;color:var(--text-faint);margin-top:6px;}
+
+.day-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.day-tab{font-family:var(--mono);font-size:12px;padding:7px 14px;border-radius:20px;border:1px solid var(--line-strong);color:var(--text-mute);cursor:pointer;background:var(--bg-panel-alt);}
+.day-tab.active{background:var(--steel);color:#0d1117;border-color:var(--steel);font-weight:600;}
+.day-tab:hover:not(.active){border-color:var(--steel);color:var(--steel);}
+
+.gauge-wrap{display:flex;gap:30px;align-items:center;justify-content:center;padding:10px 0 4px;}
+.gauge-block{text-align:center;}
+.gauge-block .cap{font-family:var(--mono);font-size:11px;color:var(--text-mute);text-transform:uppercase;letter-spacing:.06em;margin-top:10px;}
+.gauge-block .cap b{color:var(--text);font-size:15px;display:block;margin-top:2px;}
+
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:6px;}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;min-width:760px;}
+thead th{background:var(--bg-panel-alt);color:var(--text-mute);text-transform:uppercase;letter-spacing:.04em;font-size:10.5px;padding:10px 10px;text-align:right;border-bottom:1px solid var(--line-strong);white-space:nowrap;position:sticky;top:0;}
+thead th:first-child, tbody td:first-child{text-align:left;}
+tbody td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);color:var(--text);white-space:nowrap;}
+tbody tr:hover{background:var(--bg-panel-alt);}
+tbody tr:last-child td{border-bottom:none;}
+td.flag-orange{color:var(--orange);font-weight:600;}
+
+.mini-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;}
+.mini-table th{text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--text-mute);padding:6px 8px;letter-spacing:.05em;}
+.mini-table td{padding:5px 8px;}
+.mini-table input{padding:6px 8px;font-size:12px;}
+.del-btn{background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:14px;}
+.del-btn:hover{color:var(--orange);}
+
+.chart-panel{background:var(--bg-panel);border:1px solid var(--line);border-radius:6px;padding:18px 20px;}
+.chart-panel h3{font-family:var(--disp);font-size:14px;text-transform:uppercase;letter-spacing:.04em;font-weight:500;margin:0 0 14px;color:var(--text-mute);}
+canvas{max-height:240px;}
+
+footer{max-width:1440px;margin:40px auto 0;padding:20px 32px;color:var(--text-faint);font-size:11px;font-family:var(--mono);border-top:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<header class="rail">
+  <div class="rail-inner">
+    <div class="brand">
+      <div class="brand-mark">SPW</div>
+      <div>
+        <h1>Spun Pole Wastage Control</h1>
+        <p>Daily production &amp; overweight tracking — Zenn Factory</p>
+      </div>
+    </div>
+    <div class="rail-stats" id="railStats"></div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===================== LIVE SHEET CONNECTION ===================== -->
+  <div class="sec-head"><span class="tag">01</span><h2>Connect to Google Sheet</h2><div class="rule"></div><span class="hint">live data via Apps Script</span></div>
+  <div class="panel">
+    <div class="grid2">
+      <div>
+        <label class="field-label">Apps Script Web App URL</label>
+        <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/XXXXXXXX/exec" value="">
+        <div class="actions">
+          <button class="btn" onclick="connectSheet()">Connect &amp; Load</button>
+          <button class="btn secondary" onclick="connectSheet(true)">Refresh</button>
+          <span class="status-msg" id="connStatus"></span>
+        </div>
+      </div>
+      <div>
+        <p class="panel-note">
+          <b style="color:var(--text-mute)">One-time setup in your new "Spun Master Sheet new":</b><br>
+          1. Open "Spun Master Sheet new" → Extensions → Apps Script.<br>
+          2. Delete any code there and paste the script below.<br>
+          3. Deploy → New deployment → type <b>Web app</b> → Execute as <b>Me</b>, Access <b>Anyone</b> → Deploy.<br>
+          4. Copy the Web App URL it gives you and paste it into the box on the left, then click Connect.<br>
+          The old Web App URL pointed at the previous master sheet, so a fresh deployment (and a new URL) is needed here.<br>
+          The script now reads every month tab (July 2026, June 2026, …) in the spreadsheet automatically and combines them — no need to point it at one sheet name.
+        </p>
+      </div>
+    </div>
+    <div class="actions"><button class="btn small secondary" onclick="toggleScript()">Show Apps Script code to paste</button></div>
+    <pre id="scriptCode" style="display:none;background:var(--bg-raised);border:1px solid var(--line-strong);border-radius:6px;padding:14px;font-family:var(--mono);font-size:11.5px;color:var(--text-mute);overflow-x:auto;margin-top:12px;line-height:1.6;">function doGet(e) {
+  // "Spun Master Sheet new" stores data in separate month tabs
+  // (e.g. "July 2026", "June 2026", ...). This reads every tab
+  // that has the expected header row and combines them into one
+  // JSON array, so the dashboard sees all months at once.
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var rows = [];
+
+  sheets.forEach(function (sheet) {
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return; // no data rows
+
+    var headers = data[0];
+    // only treat a tab as a data tab if it has the expected columns
+    if (headers.indexOf('Date') === -1 || headers.indexOf('SN') === -1) return;
+
+    for (var i = 1; i < data.length; i++) {
+      var sn = data[i][headers.indexOf('SN')];
+      if (sn === '' || sn === null || sn === undefined) continue; // skip blank rows
+
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        var val = data[i][j];
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd-MMM-yyyy');
+        }
+        row[headers[j]] = val;
+      }
+      rows.push(row);
+    }
+  });
+
+  return ContentService.createTextOutput(JSON.stringify(rows))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+  </div>
+
+  <!-- ===================== STANDARD WEIGHTS ===================== -->
+  <div class="sec-head"><span class="tag">02</span><h2>Standard Weights</h2><div class="rule"></div><span class="hint">used for wastage calc</span></div>
+  <div class="panel">
+    <div class="std-row">
+      <div class="fld">
+        <label class="field-label" style="color:var(--steel)">6m pole standard — kg</label>
+        <input type="number" id="std6" value="160" step="0.1" onchange="recompute()">
+      </div>
+      <div class="fld">
+        <label class="field-label" style="color:var(--amber)">8.3m pole standard — kg</label>
+        <input type="number" id="std83" value="270" step="0.1" onchange="recompute()">
+      </div>
+    </div>
+    <p class="panel-note">
+      <b style="color:var(--text-mute)">Net Wastage</b> = Total Weight − (Pole Count × Standard Weight).
+      <b style="color:var(--text-mute)">Wastage considering overweight poles</b> = Overweight Weight − (Overweight Count × Standard Weight).<br>
+      Pole data is loaded directly from the <code>RAW_DATA</code> array in the code below — edit that array to plug in your real master sheet rows. No paste box, no external link.
+    </p>
+  </div>
+
+  <!-- ===================== CONCRETE BATCHING ===================== -->
+  <div class="sec-head"><span class="tag">03</span><h2>Concrete Batching — Daily</h2><div class="rule"></div><span class="hint">not in master sheet — enter per date</span></div>
+  <div class="panel">
+    <div class="table-scroll" style="border:none;">
+      <table class="mini-table" id="concreteTable" style="min-width:600px;">
+        <thead><tr><th style="width:140px;">Date</th><th>Concrete Batches (Nos)</th><th>Volume Taken Outside (Cum)</th><th>Volume Batched (Cum)</th><th></th></tr></thead>
+        <tbody id="concreteBody"></tbody>
+      </table>
+    </div>
+    <div class="actions"><button class="btn small secondary" onclick="addConcreteRow()">+ Add Date Row</button></div>
+  </div>
+
+  <div class="sec-head"><span class="tag">04</span><h2>Select Month &amp; Day</h2><div class="rule"></div><span class="hint" id="daySelHint"></span></div>
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="std-row" style="margin-top:0;">
+      <div class="fld" style="max-width:260px;">
+        <label class="field-label">Month</label>
+        <select id="monthSelect" onchange="onMonthChange()"></select>
+      </div>
+    </div>
+  </div>
+  <div id="dayTabs" class="day-tabs"></div>
+
+  <!-- ===================== 6M SECTION ===================== -->
+  <div class="type-banner t6">
+    <div class="swatch"></div><h2>6m Poles</h2>
+    <div class="std-tag" id="std6tag"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:18px;">
+    <div class="gauge-wrap" id="gauge6"></div>
+  </div>
+  <div class="kpi-row" id="kpi6" style="margin-bottom:22px;"></div>
+
+  <div class="grid3" style="margin-bottom:22px;">
+    <div class="chart-panel"><h3>Pole Count</h3><canvas id="c6count"></canvas></div>
+    <div class="chart-panel"><h3>Total &amp; Overweight Weight (kg)</h3><canvas id="c6weight"></canvas></div>
+    <div class="chart-panel"><h3>Wastage (kg)</h3><canvas id="c6waste"></canvas></div>
+  </div>
+
+  <div class="table-scroll" style="margin-bottom:10px;">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Poles</th><th>Total Wt</th><th>OW Poles</th><th>OW Wt</th><th>Avg Wt</th><th>Net Wastage</th><th>Wastage w/ OW</th>
+      </tr></thead>
+      <tbody id="table6"></tbody>
+    </table>
+  </div>
+
+  <!-- ===================== 8.3M SECTION ===================== -->
+  <div class="type-banner t83">
+    <div class="swatch"></div><h2>8.3m Poles</h2>
+    <div class="std-tag" id="std83tag"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:18px;">
+    <div class="gauge-wrap" id="gauge83"></div>
+  </div>
+  <div class="kpi-row" id="kpi83" style="margin-bottom:22px;"></div>
+
+  <div class="grid3" style="margin-bottom:22px;">
+    <div class="chart-panel"><h3>Pole Count</h3><canvas id="c83count"></canvas></div>
+    <div class="chart-panel"><h3>Total &amp; Overweight Weight (kg)</h3><canvas id="c83weight"></canvas></div>
+    <div class="chart-panel"><h3>Wastage (kg)</h3><canvas id="c83waste"></canvas></div>
+  </div>
+
+  <div class="table-scroll" style="margin-bottom:10px;">
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Poles</th><th>Total Wt</th><th>OW Poles</th><th>OW Wt</th><th>Avg Wt</th><th>Net Wastage</th><th>Wastage w/ OW</th>
+      </tr></thead>
+      <tbody id="table83"></tbody>
+    </table>
+  </div>
+
+  <!-- ===================== CONCRETE TREND ===================== -->
+  <div class="sec-head"><span class="tag">05</span><h2>Concrete Volume Trend</h2><div class="rule"></div></div>
+  <div class="chart-panel" style="margin-bottom:10px;"><canvas id="chartConcrete"></canvas></div>
+
+  <div class="actions" style="margin-top:16px;"><button class="btn secondary small" onclick="exportCSV()">Export CSV</button></div>
+
+</main>
+
+<footer>
+  SPUN POLE WASTAGE CONTROL — runs entirely client-side. Pole data is hardcoded in the RAW_DATA array inside the &lt;script&gt; tag; edit it directly to update the dashboard.
+</footer>
+
+<script>
+/* ============================================================
+   POLE DATA — populated live from your Google Sheet via
+   connectSheet(). Starts empty; falls back to a small demo
+   set below if you haven't connected yet.
+   ============================================================ */
+let RAW_DATA = [
+  ["01-Jul-2026","388081",null,283,null,283],
+  ["01-Jul-2026","388082",null,280,null,280],
+  ["01-Jul-2026","388083",149,null,null,null],
+  ["01-Jul-2026","388084",192,null,192,null],
+  ["02-Jul-2026","388137",null,278,null,278],
+  ["02-Jul-2026","388211",292,null,292,null],
+  ["03-Jul-2026","388210",258,null,258,null],
+  ["04-Jul-2026","388289",300,null,300,null]
+];
+
+/* Concrete batching — [date, batches, volOutside, volBatched] */
+const CONCRETE_DATA = [
+  ["01-Jul-2026", 13, 0, 6.5],
+  ["02-Jul-2026", 11, 0, 5.5],
+  ["03-Jul-2026", 14, 0, 7],
+  ["04-Jul-2026", 0, 0, 0]
+];
+
+let daily = [];
+let selectedDate = null;
+let selectedMonth = null; // 'YYYY-MM'
+let charts = {};
+
+/* ---------- LIVE SHEET CONNECTION ---------- */
+function toggleScript(){
+  const el = document.getElementById('scriptCode');
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function toNum(v){
+  if(v===null||v===undefined) return null;
+  const s = String(v).trim();
+  if(s===''||s==='-'||s.toLowerCase()==='na') return null;
+  const n = parseFloat(s.replace(/,/g,''));
+  return isNaN(n) ? null : n;
+}
+
+function pick(row, ...names){
+  for(const n of names){
+    for(const k of Object.keys(row)){
+      if(k.trim().toLowerCase() === n.trim().toLowerCase()) return row[k];
+    }
+  }
+  return null;
+}
+
+async function connectSheet(isRefresh){
+  const url = document.getElementById('scriptUrl').value.trim();
+  const statusEl = document.getElementById('connStatus');
+  if(!url){ statusEl.className='status-msg err'; statusEl.textContent='Paste your Apps Script Web App URL first.'; return; }
+  statusEl.className='status-msg';
+  statusEl.textContent = isRefresh ? 'Refreshing…' : 'Connecting…';
+  try{
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const json = await res.json();
+    if(json.error) throw new Error(json.error);
+    if(!Array.isArray(json)) throw new Error('Unexpected response format');
+    RAW_DATA = json.map(r => [
+      pick(r,'Date'),
+      pick(r,'SN'),
+      toNum(pick(r,'6m Pole Weight (kg)','6m Pole Weight')),
+      toNum(pick(r,'8.3m Pole Weight (kg)','8.3m Pole Weight')),
+      toNum(pick(r,'6m Overweight pole weight (kg)','6m Overweight pole weight')),
+      toNum(pick(r,'8.3m Overweight pole weight (kg)','8.3m Overweight pole weight'))
+    ]);
+    statusEl.className='status-msg';
+    statusEl.textContent = `Loaded ${RAW_DATA.length} rows from your sheet.`;
+    recompute();
+  }catch(err){
+    statusEl.className='status-msg err';
+    statusEl.textContent = 'Failed to load: '+err.message+' — check deployment access is "Anyone" and the URL is correct.';
+  }
+}
+
+function parseDate(raw){
+  if(!raw) return null;
+  raw = String(raw).trim();
+  let m = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if(m){
+    const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+    let mon = months[m[2].toLowerCase()]; let yr = parseInt(m[3]); if(yr<100) yr+=2000;
+    return new Date(yr, mon, parseInt(m[1]));
+  }
+  m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  let d = new Date(raw);
+  return isNaN(d) ? null : d;
+}
+function fmtDate(d){
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return String(d.getDate()).padStart(2,'0')+'-'+months[d.getMonth()]+'-'+d.getFullYear();
+}
+function keyDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fnum(v,dp=2){ return v===null||v===undefined||isNaN(v) ? '—' : v.toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function inum(v){ return v===null||v===undefined ? '—' : v; }
+
+/* ---------- CONCRETE ROWS (editable UI, seeded from CONCRETE_DATA) ---------- */
+function addConcreteRow(dateStr, batches, volOut, volBatch){
+  const tbody = document.getElementById('concreteBody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" placeholder="01-Jul-2026" value="${dateStr||''}" onchange="syncConcrete()"></td>
+    <td><input type="number" step="1" value="${batches!=null?batches:''}" onchange="syncConcrete()"></td>
+    <td><input type="number" step="0.1" value="${volOut!=null?volOut:''}" onchange="syncConcrete()"></td>
+    <td><input type="number" step="0.1" value="${volBatch!=null?volBatch:''}" onchange="syncConcrete()"></td>
+    <td><button class="del-btn" onclick="this.closest('tr').remove(); syncConcrete();">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+let concrete = {};
+function syncConcrete(){
+  concrete = {};
+  document.querySelectorAll('#concreteBody tr').forEach(tr=>{
+    const inputs = tr.querySelectorAll('input');
+    const d = parseDate(inputs[0].value);
+    if(!d) return;
+    concrete[keyDate(d)] = { batches:parseFloat(inputs[1].value)||null, volOutside:parseFloat(inputs[2].value)||null, volBatched:parseFloat(inputs[3].value)||null };
+  });
+  recompute();
+}
+CONCRETE_DATA.forEach(r=>addConcreteRow(r[0],r[1],r[2],r[3]));
+syncConcrete();
+
+/* ---------- AGGREGATION ---------- */
+function recompute(){
+  const std6 = parseFloat(document.getElementById('std6').value)||0;
+  const std83 = parseFloat(document.getElementById('std83').value)||0;
+  document.getElementById('std6tag').textContent = `standard: ${std6} kg`;
+  document.getElementById('std83tag').textContent = `standard: ${std83} kg`;
+
+  const byDate = {};
+  RAW_DATA.forEach(row=>{
+    const d = parseDate(row[0]); if(!d) return;
+    const k = keyDate(d);
+    if(!byDate[k]) byDate[k] = {date:d, w6sum:0,w6cnt:0,w83sum:0,w83cnt:0, ow6sum:0,ow6cnt:0, ow83sum:0,ow83cnt:0};
+    const b = byDate[k];
+    const w6=row[2], w83=row[3], ow6=row[4], ow83=row[5];
+    if(w6!==null && w6!==undefined){ b.w6sum+=w6; b.w6cnt++; }
+    if(w83!==null && w83!==undefined){ b.w83sum+=w83; b.w83cnt++; }
+    if(ow6!==null && ow6!==undefined){ b.ow6sum+=ow6; b.ow6cnt++; }
+    if(ow83!==null && ow83!==undefined){ b.ow83sum+=ow83; b.ow83cnt++; }
+  });
+
+  const allKeys = new Set([...Object.keys(byDate), ...Object.keys(concrete)]);
+  daily = [...allKeys].sort().map(k=>{
+    const b = byDate[k] || {date:parseDate(k), w6sum:0,w6cnt:0,w83sum:0,w83cnt:0, ow6sum:0,ow6cnt:0, ow83sum:0,ow83cnt:0};
+    const c = concrete[k] || {batches:null,volOutside:null,volBatched:null};
+    const avg6 = b.w6cnt? b.w6sum/b.w6cnt : null;
+    const avg83 = b.w83cnt? b.w83sum/b.w83cnt : null;
+    const netW6 = b.w6cnt!=null ? b.w6sum - b.w6cnt*std6 : null;
+    const netW83 = b.w83cnt!=null ? b.w83sum - b.w83cnt*std83 : null;
+    const owW6 = b.ow6cnt ? b.ow6sum - b.ow6cnt*std6 : (b.ow6cnt===0?0:null);
+    const owW83 = b.ow83cnt ? b.ow83sum - b.ow83cnt*std83 : (b.ow83cnt===0?0:null);
+    return { key:k, date:b.date,
+      count6:b.w6cnt, count83:b.w83cnt, weight6:b.w6sum, weight83:b.w83sum,
+      owCount6:b.ow6cnt, owCount83:b.ow83cnt, owWeight6:b.ow6sum, owWeight83:b.ow83sum,
+      avg6, avg83, netW6, netW83, owWasteW6:owW6, owWasteW83:owW83,
+      batches:c.batches, volOutside:c.volOutside, volBatched:c.volBatched };
+  });
+
+  renderRail(); renderMonthOptions(); renderDayTabs(); renderTypeSection('6'); renderTypeSection('83'); renderTables(); renderCharts();
+}
+
+function monthDaily(){ return daily.filter(d=>monthKey(d.date)===selectedMonth); }
+
+function monthKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function monthLabel(mk){
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [y,m] = mk.split('-'); return months[parseInt(m)-1]+' '+y;
+}
+function renderMonthOptions(){
+  const sel = document.getElementById('monthSelect');
+  const months = [...new Set(daily.map(d=>monthKey(d.date)))].sort();
+  if(!months.length){ sel.innerHTML = '<option>No data</option>'; return; }
+  if(!selectedMonth || !months.includes(selectedMonth)) selectedMonth = months[months.length-1];
+  sel.innerHTML = months.map(mk=>`<option value="${mk}" ${mk===selectedMonth?'selected':''}>${monthLabel(mk)}</option>`).join('');
+}
+function onMonthChange(){
+  selectedMonth = document.getElementById('monthSelect').value;
+  const daysInMonth = monthDaily();
+  selectedDate = daysInMonth.length ? daysInMonth[daysInMonth.length-1].key : null;
+  renderDayTabs(); renderTypeSection('6'); renderTypeSection('83'); renderTables(); renderCharts();
+}
+
+function renderRail(){
+  const totalDays = daily.length;
+  const totalPoles = daily.reduce((s,d)=>s+(d.count6||0)+(d.count83||0),0);
+  const totalWaste = daily.reduce((s,d)=> s + (d.owWasteW6||0) + (d.owWasteW83||0), 0);
+  document.getElementById('railStats').innerHTML = `
+    <div class="rail-stat"><div class="k">${totalDays||'—'}</div><div class="l">Days Loaded</div></div>
+    <div class="rail-stat"><div class="k">${totalPoles||'—'}</div><div class="l">Poles Logged</div></div>
+    <div class="rail-stat warn"><div class="k">${totalDays? fnum(totalWaste,0):'—'}</div><div class="l">Total Wastage (kg)</div></div>`;
+}
+
+function renderDayTabs(){
+  const wrap = document.getElementById('dayTabs'); wrap.innerHTML='';
+  const daysInMonth = daily.filter(d=>monthKey(d.date)===selectedMonth);
+  document.getElementById('daySelHint').textContent = daysInMonth.length ? `${daysInMonth.length} day(s) in ${monthLabel(selectedMonth)}` : 'no data for this month';
+  if(!daysInMonth.find(d=>d.key===selectedDate)) selectedDate = daysInMonth.length ? daysInMonth[daysInMonth.length-1].key : null;
+  daysInMonth.forEach(d=>{
+    const btn = document.createElement('div');
+    btn.className = 'day-tab' + (d.key===selectedDate?' active':'');
+    btn.textContent = fmtDate(d.date);
+    btn.onclick = ()=>{ selectedDate=d.key; renderDayTabs(); renderTypeSection('6'); renderTypeSection('83'); };
+    wrap.appendChild(btn);
+  });
+}
+
+function gaugeSVG(value, standard, colorVar){
+  const max = standard * 1.5 || 1;
+  const pct = value==null ? 0 : Math.min(value/max, 1);
+  const h = 130, w = 46;
+  const fillH = h*pct;
+  const overStd = value!=null && value>standard;
+  const color = overStd ? 'var(--orange)' : `var(--${colorVar})`;
+  const stdY = h - (standard/max)*h;
+  return `<svg width="${w}" height="${h+14}" viewBox="0 0 ${w} ${h+14}">
+    <rect x="2" y="2" width="${w-4}" height="${h}" rx="8" fill="var(--bg-raised)" stroke="var(--line-strong)"/>
+    <rect x="2" y="${2+h-fillH}" width="${w-4}" height="${fillH}" rx="8" fill="${color}" opacity="0.85"/>
+    <line x1="0" y1="${2+stdY}" x2="${w}" y2="${2+stdY}" stroke="var(--text)" stroke-width="1.5" stroke-dasharray="3,2"/>
+  </svg>`;
+}
+
+function renderTypeSection(type){
+  const std = parseFloat(document.getElementById('std'+type).value)||0;
+  const colorVar = type==='6' ? 'steel' : 'amber';
+  const label = type==='6' ? '6m' : '8.3m';
+  const d = daily.find(x=>x.key===selectedDate);
+  const gWrap = document.getElementById('gauge'+type);
+  const kRow = document.getElementById('kpi'+type);
+  if(!d){ gWrap.innerHTML='<p class="panel-note">No data.</p>'; kRow.innerHTML=''; return; }
+
+  const avg = type==='6' ? d.avg6 : d.avg83;
+  gWrap.innerHTML = `
+    <div class="gauge-block">
+      ${gaugeSVG(avg, std, colorVar)}
+      <div class="cap">Avg ${label} weight<b>${fnum(avg)} kg</b></div>
+    </div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text-faint);max-width:260px;line-height:1.6;">
+      Dashed line = standard weight (${std}kg). Fill turns <span style="color:var(--orange)">orange</span> when the day's average exceeds standard.
+    </div>`;
+
+  const count = type==='6'?d.count6:d.count83;
+  const weight = type==='6'?d.weight6:d.weight83;
+  const owCount = type==='6'?d.owCount6:d.owCount83;
+  const owWeight = type==='6'?d.owWeight6:d.owWeight83;
+  const netW = type==='6'?d.netW6:d.netW83;
+  const owWaste = type==='6'?d.owWasteW6:d.owWasteW83;
+
+  const cards = [
+    ['Poles Produced', inum(count), 't'+type],
+    ['Total Weight', fnum(weight,0)+' kg', 't'+type],
+    ['Overweight Poles', inum(owCount), 'alert'],
+    ['Overweight Weight', fnum(owWeight,0)+' kg', 'alert'],
+    ['Average Weight', fnum(avg)+' kg', 't'+type],
+    ['Net Wastage', fnum(netW,0)+' kg', ''],
+    ['Wastage w/ Overweight', fnum(owWaste,0)+' kg', 'alert'],
+  ];
+  kRow.innerHTML = cards.map(c=>`<div class="kpi ${c[2]}"><div class="l">${c[0]}</div><div class="v">${c[1]}</div></div>`).join('');
+}
+
+function renderTables(){
+  const rows = monthDaily();
+  document.getElementById('table6').innerHTML = rows.length ? rows.map(d=>`
+    <tr><td>${fmtDate(d.date)}</td><td>${inum(d.count6)}</td><td>${fnum(d.weight6,0)}</td>
+    <td class="${d.owCount6?'flag-orange':''}">${inum(d.owCount6)}</td><td>${fnum(d.owWeight6,0)}</td>
+    <td>${fnum(d.avg6)}</td><td>${fnum(d.netW6,0)}</td><td class="flag-orange">${fnum(d.owWasteW6,0)}</td></tr>`).join('')
+    : `<tr><td colspan="8" style="text-align:center;color:var(--text-faint);padding:20px;">No data for this month.</td></tr>`;
+
+  document.getElementById('table83').innerHTML = rows.length ? rows.map(d=>`
+    <tr><td>${fmtDate(d.date)}</td><td>${inum(d.count83)}</td><td>${fnum(d.weight83,0)}</td>
+    <td class="${d.owCount83?'flag-orange':''}">${inum(d.owCount83)}</td><td>${fnum(d.owWeight83,0)}</td>
+    <td>${fnum(d.avg83)}</td><td>${fnum(d.netW83,0)}</td><td class="flag-orange">${fnum(d.owWasteW83,0)}</td></tr>`).join('')
+    : `<tr><td colspan="8" style="text-align:center;color:var(--text-faint);padding:20px;">No data for this month.</td></tr>`;
+}
+
+function baseOpts(){
+  return { responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{ labels:{color:'#8B93A3', font:{family:'IBM Plex Mono', size:10.5} } } },
+    scales:{ x:{ ticks:{color:'#5B6272', font:{family:'IBM Plex Mono', size:10}}, grid:{color:'rgba(255,255,255,0.05)'} },
+             y:{ ticks:{color:'#5B6272', font:{family:'IBM Plex Mono', size:10}}, grid:{color:'rgba(255,255,255,0.05)'} } } };
+}
+function mkChart(id, labels, datasets, type='line'){
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id).getContext('2d');
+  charts[id] = new Chart(ctx, { type, data:{labels, datasets}, options: baseOpts() });
+}
+function renderCharts(){
+  const rows = monthDaily();
+  const labels = rows.map(d=>fmtDate(d.date));
+  const steel='#4E86C8', amber='#E8B23C', orange='#F2703C', green='#57C695';
+
+  mkChart('c6count', labels, [{label:'6m Poles', data:rows.map(d=>d.count6), backgroundColor:steel}], 'bar');
+  mkChart('c6weight', labels, [
+    {label:'Total Weight', data:rows.map(d=>d.weight6), borderColor:steel, backgroundColor:steel, tension:.3},
+    {label:'Overweight Weight', data:rows.map(d=>d.owWeight6), borderColor:orange, backgroundColor:orange, borderDash:[4,3], tension:.3}
+  ]);
+  mkChart('c6waste', labels, [
+    {label:'Net Wastage', data:rows.map(d=>d.netW6), borderColor:steel, backgroundColor:steel, tension:.3},
+    {label:'Wastage w/ OW', data:rows.map(d=>d.owWasteW6), borderColor:orange, backgroundColor:orange, borderDash:[4,3], tension:.3}
+  ]);
+
+  mkChart('c83count', labels, [{label:'8.3m Poles', data:rows.map(d=>d.count83), backgroundColor:amber}], 'bar');
+  mkChart('c83weight', labels, [
+    {label:'Total Weight', data:rows.map(d=>d.weight83), borderColor:amber, backgroundColor:amber, tension:.3},
+    {label:'Overweight Weight', data:rows.map(d=>d.owWeight83), borderColor:orange, backgroundColor:orange, borderDash:[4,3], tension:.3}
+  ]);
+  mkChart('c83waste', labels, [
+    {label:'Net Wastage', data:rows.map(d=>d.netW83), borderColor:amber, backgroundColor:amber, tension:.3},
+    {label:'Wastage w/ OW', data:rows.map(d=>d.owWasteW83), borderColor:orange, backgroundColor:orange, borderDash:[4,3], tension:.3}
+  ]);
+
+  mkChart('chartConcrete', labels, [
+    {label:'Volume Outside', data:rows.map(d=>d.volOutside), borderColor:green, backgroundColor:green, tension:.3},
+    {label:'Volume Batched', data:rows.map(d=>d.volBatched), borderColor:steel, backgroundColor:steel, tension:.3}
+  ]);
+}
+
+function exportCSV(){
+  const monthRows = monthDaily();
+  if(!monthRows.length) return;
+  const headers = ['Date','Poles6m','Weight6m','OWPoles6m','OWWeight6m','Avg6m','NetWaste6m','WasteOW6m','Poles8.3m','Weight8.3m','OWPoles8.3m','OWWeight8.3m','Avg8.3m','NetWaste8.3m','WasteOW8.3m','Batches','VolOutside','VolBatched'];
+  const rows = monthRows.map(d=>[fmtDate(d.date),d.count6,d.weight6,d.owCount6,d.owWeight6,d.avg6,d.netW6,d.owWasteW6,d.count83,d.weight83,d.owCount83,d.owWeight83,d.avg83,d.netW83,d.owWasteW83,d.batches,d.volOutside,d.volBatched]);
+  const csv = [headers.join(','), ...rows.map(r=>r.map(v=>v===null||v===undefined?'':v).join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'pole_wastage_dashboard.csv'; a.click();
+}
+
+recompute();
+if(document.getElementById('scriptUrl').value.trim()) connectSheet();
+</script>
+</body>
+</html>
